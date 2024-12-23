@@ -72,6 +72,26 @@
             };
         }
 
+        // 添加性能配置对象
+        const CONFIG = {
+            mobile: {
+                particleCount: 80,  // 减少移动端粒子数量
+                heartCount: 10,     // 减少移动端背景爱心数量
+                clearInterval: 40,  // 降低清屏频率
+                decaySpeed: 0.01,  // 加快消失速度
+                particleSize: 1.5,  // 减小粒子大小
+                heartSize: 6       // 减小爱心大小
+            },
+            desktop: {
+                particleCount: 160,
+                heartCount: 20,
+                clearInterval: 30,
+                decaySpeed: 0.008,
+                particleSize: 2,
+                heartSize: 10
+            }
+        };
+
         class Particle {
             constructor(x, y, color, velocity, isHeart = false) {
                 this.x = x;
@@ -79,17 +99,19 @@
                 this.color = color;
                 this.velocity = velocity;
                 this.alpha = 1;
-                this.friction = 0.99;
-                this.gravity = 0.02;
-                this.size = isHeart ? Math.random() * 3 + 2 : Math.random() * 2 + 1;
-                this.life = Math.random() * 150 + 150;
-                this.decay = Math.random() * 0.008 + 0.003;
+                this.friction = 0.98; // 增加摩擦力，减少计算量
+                this.gravity = 0.03; // 增加重力，加快下落
+                const config = window.innerWidth < 768 ? CONFIG.mobile : CONFIG.desktop;
+                this.size = isHeart ? 
+                    Math.random() * config.particleSize + 1.5 : 
+                    Math.random() * config.particleSize + 0.5;
+                this.life = Math.random() * 100 + 100; // 减少生命周期
+                this.decay = config.decaySpeed;
                 this.isHeart = isHeart;
             }
             
             draw() {
-                if (this.alpha < 0.05) return;
-                ctx.save();
+                if (this.alpha < 0.03) return; // 提高透明度阈值
                 ctx.globalAlpha = this.alpha;
                 if (this.isHeart) {
                     ctx.fillStyle = this.color;
@@ -99,7 +121,6 @@
                     ctx.fillStyle = this.color;
                     ctx.fillRect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
                 }
-                ctx.restore();
             }
             
             update() {
@@ -125,25 +146,25 @@
             }
             
             createParticles() {
-                const pinkHues = [
-                    '#FF80AB', '#FF8DA1', '#FF98B4',
-                    '#FF69B4', '#FFB5C5', '#FFC0CB'
-                ];
+                const config = window.innerWidth < 768 ? CONFIG.mobile : CONFIG.desktop;
+                const pinkHues = ['#FF80AB', '#FF69B4', '#FFB5C5']; // 减少颜色数量
 
                 if (this.isSpecial) {
-                    const particleCount = window.innerWidth < 768 ? 120 : 240;
+                    const particleCount = config.particleCount;
+                    const angleStep = (Math.PI * 2) / particleCount;
+                    
                     for(let i = 0; i < particleCount; i++) {
-                        const t = (i / 180) * Math.PI * 2;
-                        const heart = heartShape(t, 20);
+                        const angle = i * angleStep;
+                        const heart = heartShape(angle, config.heartSize);
                         const velocity = {
-                            x: heart.x * 0.08,
-                            y: heart.y * 0.08
+                            x: heart.x * 0.06, // 降低速度
+                            y: heart.y * 0.06
                         };
                         this.particles.push(
                             new Particle(
                                 this.x,
                                 this.y,
-                                pinkHues[Math.floor(Math.random() * pinkHues.length)],
+                                pinkHues[i % pinkHues.length],
                                 velocity,
                                 true
                             )
@@ -173,16 +194,21 @@
         
         // 在 script 标签内添加背景爱心类
         class BackgroundHeart {
-            constructor() {
+            reset() {
+                const config = window.innerWidth < 768 ? CONFIG.mobile : CONFIG.desktop;
                 this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                const baseSize = window.innerWidth < 768 ? 8 : 12;
-                this.size = Math.random() * baseSize + 4;
-                this.color = `rgba(255, 105, 180, ${Math.random() * 0.5 + 0.5})`;
-                this.speed = Math.random() * 0.5 + 0.1;
+                this.y = canvas.height + config.heartSize;
+                this.size = Math.random() * config.heartSize + 2;
+                this.color = `rgba(255, 105, 180, ${Math.random() * 0.3 + 0.2})`;
+                this.speed = Math.random() * 0.3 + 0.1;
                 this.breaking = false;
                 this.breakingParticles = [];
                 this.breakingProgress = 0;
+                return this;
+            }
+            
+            constructor() {
+                this.reset();
             }
 
             draw() {
@@ -250,39 +276,73 @@
         // 添加背景爱心数组
         let backgroundHearts = [];
 
+        // 添加对象池管理
+        const heartPool = {
+            pool: [],
+            maxSize: 50,
+            
+            get() {
+                if (this.pool.length > 0) {
+                    return this.pool.pop().reset();
+                }
+                return new BackgroundHeart();
+            },
+            
+            release(heart) {
+                if (this.pool.length < this.maxSize) {
+                    this.pool.push(heart);
+                }
+            }
+        };
+
         // 修改 animate 函数
         function animate() {
+            const config = window.innerWidth < 768 ? CONFIG.mobile : CONFIG.desktop;
+            
+            if (!animate.lastTime) {
+                animate.lastTime = Date.now();
+            }
+            
+            const now = Date.now();
+            const delta = now - animate.lastTime;
+            
+            if (delta > config.clearInterval) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                animate.lastTime = now;
+            }
+            
             requestAnimationFrame(animate);
             
-            if (!animate.lastClear || Date.now() - animate.lastClear > 30) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                animate.lastClear = Date.now();
-            }
-            
+            // 使用对象池管理粒子
             if (backgroundHearts.length === 0 && fireworks.length > 0) {
-                const heartCount = window.innerWidth < 768 ? 15 : 30;
-                for (let i = 0; i < heartCount; i++) {
-                    backgroundHearts.push(new BackgroundHeart());
+                for (let i = 0; i < config.heartCount; i++) {
+                    const heart = heartPool.get();
+                    if (heart) {
+                        backgroundHearts.push(heart);
+                    }
                 }
             }
             
-            backgroundHearts = backgroundHearts.filter(heart => {
+            // 优化数组操作
+            let i = backgroundHearts.length;
+            while (i--) {
+                const heart = backgroundHearts[i];
                 const shouldRemove = heart.update();
-                if (!shouldRemove) {
+                if (shouldRemove) {
+                    heartPool.release(backgroundHearts.splice(i, 1)[0]);
+                } else {
                     heart.draw();
                 }
-                return !shouldRemove;
-            });
+            }
             
-            // 更新和绘制烟花
-            let activeFireworks = [];
-            for (let i = 0; i < fireworks.length; i++) {
-                if (!fireworks[i].isFinished()) {
+            i = fireworks.length;
+            while (i--) {
+                if (fireworks[i].isFinished()) {
+                    fireworks.splice(i, 1);
+                } else {
                     fireworks[i].update();
-                    activeFireworks.push(fireworks[i]);
                 }
             }
-            fireworks = activeFireworks;
         }
         
         // 修改 startFireworks 函数
