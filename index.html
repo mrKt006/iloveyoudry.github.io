@@ -2,7 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>浪漫表白烟花</title>
+    <title>爱你宝宝</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
             margin: 0;
@@ -80,9 +81,9 @@
                 this.alpha = 1;
                 this.friction = 0.99;
                 this.gravity = 0.02;
-                this.size = isHeart ? Math.random() * 4 + 3 : Math.random() * 3 + 1.5;
+                this.size = isHeart ? Math.random() * 3 + 2 : Math.random() * 2 + 1;
                 this.life = Math.random() * 150 + 150;
-                this.decay = Math.random() * 0.006 + 0.002;
+                this.decay = Math.random() * 0.008 + 0.003;
                 this.isHeart = isHeart;
             }
             
@@ -130,7 +131,8 @@
                 ];
 
                 if (this.isSpecial) {
-                    for(let i = 0; i < 240; i++) {
+                    const particleCount = window.innerWidth < 768 ? 120 : 240;
+                    for(let i = 0; i < particleCount; i++) {
                         const t = (i / 180) * Math.PI * 2;
                         const heart = heartShape(t, 20);
                         const velocity = {
@@ -174,7 +176,8 @@
             constructor() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 12 + 4;
+                const baseSize = window.innerWidth < 768 ? 8 : 12;
+                this.size = Math.random() * baseSize + 4;
                 this.color = `rgba(255, 105, 180, ${Math.random() * 0.5 + 0.5})`;
                 this.speed = Math.random() * 0.5 + 0.1;
                 this.breaking = false;
@@ -251,13 +254,17 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            if (!animate.lastClear || Date.now() - animate.lastClear > 30) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                animate.lastClear = Date.now();
+            }
+            
             if (backgroundHearts.length === 0 && fireworks.length > 0) {
-                for (let i = 0; i < 30; i++) {
+                const heartCount = window.innerWidth < 768 ? 15 : 30;
+                for (let i = 0; i < heartCount; i++) {
                     backgroundHearts.push(new BackgroundHeart());
                 }
             }
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             backgroundHearts = backgroundHearts.filter(heart => {
                 const shouldRemove = heart.update();
@@ -322,9 +329,9 @@
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // 重新创建背景爱心
             backgroundHearts = [];
-            for (let i = 0; i < 50; i++) {
+            const heartCount = window.innerWidth < 768 ? 20 : 50;
+            for (let i = 0; i < heartCount; i++) {
                 backgroundHearts.push(new BackgroundHeart());
             }
         });
@@ -342,6 +349,46 @@
                 }
             });
         });
+
+        // 添加设备性能检测
+        function checkDevicePerformance() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                // 移动设备优化设置
+                return {
+                    particleCount: 120,
+                    heartCount: 15,
+                    clearInterval: 30,
+                    decaySpeed: 0.008
+                };
+            }
+            // 桌面设备设置
+            return {
+                particleCount: 240,
+                heartCount: 30,
+                clearInterval: 20,
+                decaySpeed: 0.006
+            };
+        }
+
+        // 在文字破碎效果中也减少粒子
+        function breakText() {
+            if (isTextBroken) return;
+            isTextBroken = true;
+
+            const loveText = document.getElementById('loveText');
+            const text = loveText.textContent;
+            const rect = loveText.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const x = centerX + (i - text.length / 2) * (window.innerWidth < 768 ? 30 : 40);
+                const y = centerY;
+                textParticles.push(new TextParticle(x, y, char));
+            }
+        }
     </script>
 </body>
 </html>
